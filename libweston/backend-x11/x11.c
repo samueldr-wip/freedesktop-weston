@@ -123,6 +123,11 @@ struct x11_backend {
 
 	const struct pixel_format_info **formats;
 	unsigned int formats_count;
+
+	char* configured_title;
+	char* configured_wm_class_name;
+	char* configured_wm_class_class;
+	char* configured_icon_filename;
 };
 
 struct x11_head {
@@ -945,12 +950,52 @@ x11_output_enable(struct weston_output *base)
 	b = output->backend;
 
 	static const char name[] = "Weston Compositor";
-	static const char class[] = "weston-1\0Weston Compositor";
+	static const char default_class[] = "weston-1\0Weston Compositor";
+	char *class = NULL;
 	char *title = NULL;
+	size_t class_len = 0;
 	xcb_screen_t *screen;
 	struct wm_normal_hints normal_hints;
 	struct wl_event_loop *loop;
 	char *icon_filename;
+
+	if (b->configured_wm_class_name
+	    && strlen(b->configured_wm_class_name) > 0
+	    && b->configured_wm_class_class
+	    && strlen(b->configured_wm_class_class) > 0
+	) {
+		class_len += strlen(b->configured_wm_class_name);
+		class_len += strlen(b->configured_wm_class_class);
+		class_len += 2;
+
+		class = calloc(1, class_len);
+
+		memcpy(
+			class
+			, b->configured_wm_class_name
+			, strlen(b->configured_wm_class_name)
+		);
+		memcpy(
+			class + strlen(b->configured_wm_class_class)+1
+			, b->configured_wm_class_class
+			, strlen(b->configured_wm_class_class)
+		);
+	}
+
+	if (!class) {
+		class_len = sizeof default_class;
+		/* Needless memcpy to use `free` unconditionally later */
+		class = calloc(1, class_len);
+		class = memcpy(class, default_class, class_len);
+	}
+
+	if (b->configured_title && strlen(b->configured_title) > 0) {
+		title = strdup(b->configured_title);
+	}
+
+	if (b->configured_icon_filename && strlen(b->configured_icon_filename) > 0) {
+		icon_filename = strdup(b->configured_icon_filename);
+	}
 
 	int ret;
 	uint32_t mask = XCB_CW_EVENT_MASK | XCB_CW_CURSOR;
@@ -1010,11 +1055,13 @@ x11_output_enable(struct weston_output *base)
 	}
 
 	/* Set window name.  Don't bother with non-EWMH WMs. */
-	if (output->base.name) {
-		if (asprintf(&title, "%s - %s", name, output->base.name) < 0)
-			title = NULL;
-	} else {
-		title = strdup(name);
+	if (!title || strlen(title) == 0) {
+		if (output->base.name) {
+			if (asprintf(&title, "%s - %s", name, output->base.name) < 0)
+				title = NULL;
+		} else {
+			title = strdup(name);
+		}
 	}
 
 	if (title) {
@@ -1028,9 +1075,12 @@ x11_output_enable(struct weston_output *base)
 
 	xcb_change_property(b->conn, XCB_PROP_MODE_REPLACE, output->window,
 			    b->atom.wm_class, b->atom.string, 8,
-			    sizeof class, class);
+			    class_len, class);
+	free(class);
 
-	icon_filename = file_name_with_datadir("wayland.png");
+	if (!icon_filename || strlen(icon_filename) == 0) {
+		icon_filename = file_name_with_datadir("wayland.png");
+	}
 	x11_output_set_icon(b, output, icon_filename);
 	free(icon_filename);
 
@@ -1870,6 +1920,10 @@ x11_backend_create(struct weston_compositor *compositor,
 	b->compositor = compositor;
 	b->fullscreen = config->fullscreen;
 	b->no_input = config->no_input;
+	b->configured_title = config->title;
+	b->configured_wm_class_name = config->wm_class_name;
+	b->configured_wm_class_class = config->wm_class_class;
+	b->configured_icon_filename = config->icon_filename;
 
 	compositor->backend = &b->base;
 

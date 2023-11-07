@@ -3491,6 +3491,11 @@ load_x11_backend(struct weston_compositor *c,
 	       { WESTON_OPTION_BOOLEAN, "use-pixman", 0, &force_pixman },
 	};
 
+	weston_config_section_get_string(section, "title", &config.title, NULL);
+	weston_config_section_get_string(section, "wm_class_name", &config.wm_class_name, NULL);
+	weston_config_section_get_string(section, "wm_class_class", &config.wm_class_class, NULL);
+	weston_config_section_get_string(section, "icon_filename", &config.icon_filename, NULL);
+
 	parse_options(options, ARRAY_LENGTH(options), argc, argv);
 
 	config.base.struct_version = WESTON_X11_BACKEND_CONFIG_VERSION;

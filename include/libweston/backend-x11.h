@@ -43,6 +43,11 @@ struct weston_x11_backend_config {
 	bool no_input;
 
 	enum weston_renderer_type renderer;
+
+	char *title;
+	char *wm_class_name;
+	char *wm_class_class;
+	char *icon_filename;
 };
 
 #ifdef  __cplusplus
